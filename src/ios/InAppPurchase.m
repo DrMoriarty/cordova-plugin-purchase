@@ -752,8 +752,10 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
     [self.plugin.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 
 #if ARC_ENABLED
-    [self.plugin.retainer removeObjectForKey:@"receiptRefreshRequest"];
-    [self.plugin.retainer removeObjectForKey:@"receiptRefreshRequestDelegate"];
+    // do not remove delegate (self) from retainer
+    // may be it will fix the crash
+    //[self.plugin.retainer removeObjectForKey:@"receiptRefreshRequest"];
+    //[self.plugin.retainer removeObjectForKey:@"receiptRefreshRequestDelegate"];
 #else
     [request release];
     [self    release];
