@@ -116,9 +116,6 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
     }
 
     NSString *ret = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
-#if ARC_DISABLED
-    [ret autorelease];
-#endif
     return ret;
 }
 @end
@@ -126,14 +123,13 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
 @implementation InAppPurchase
 
 @synthesize products;
-@synthesize retainer;
 @synthesize currentDownloads;
 @synthesize unfinishedTransactions;
 @synthesize pendingTransactionUpdates;
+@synthesize productsRequest, productsRequestDelegate, receiptRefreshRequest, refreshReceiptDelegate;
 
 // Initialize the plugin state
 -(void) pluginInitialize {
-    self.retainer = [[NSMutableDictionary alloc] init];
     self.products = [[NSMutableDictionary alloc] init];
     self.currentDownloads = [[NSMutableDictionary alloc] init];
     self.pendingTransactionUpdates = [[NSMutableArray alloc] init];
@@ -206,19 +202,12 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
     for (NSString *item in productIdentifiers) {
       DLog(@"load:  - %@", item);
     }
-    SKProductsRequest *productsRequest = [[SKProductsRequest alloc] initWithProductIdentifiers:productIdentifiers];
+    productsRequest = [[SKProductsRequest alloc] initWithProductIdentifiers:productIdentifiers];
 
-    BatchProductsRequestDelegate* delegate = [[BatchProductsRequestDelegate alloc] init];
-    productsRequest.delegate = delegate;
-    delegate.plugin  = self;
-    delegate.command = command;
-
-#if ARC_ENABLED
-    self.retainer[[NSString stringWithFormat:@"productsRequest%@", productIdentifiers]] = productsRequest;
-    self.retainer[[NSString stringWithFormat:@"productsRequestDelegate%@", productIdentifiers]] = delegate;
-#else
-    [delegate retain];
-#endif
+    productsRequestDelegate = [[BatchProductsRequestDelegate alloc] init];
+    productsRequest.delegate = productsRequestDelegate;
+    productsRequestDelegate.plugin  = self;
+    productsRequestDelegate.command = command;
 
     DLog(@"load: Starting product request...");
     [productsRequest start];
@@ -489,9 +478,6 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
 
     if (receiptURL != nil) {
         NSData *receiptData = [NSData dataWithContentsOfURL:receiptURL];
-#if ARC_DISABLED
-        [receiptData autorelease];
-#endif
         return receiptData;
     }
     else {
@@ -515,19 +501,12 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
 - (void) appStoreRefreshReceipt: (CDVInvokedUrlCommand*)command {
 
     DLog(@"appStoreRefreshReceipt: Request to refresh app receipt");
-    RefreshReceiptDelegate* refreshReceiptDelegate = [[RefreshReceiptDelegate alloc] init];
-    SKReceiptRefreshRequest* receiptRefreshRequest = [[SKReceiptRefreshRequest alloc] init];
+    refreshReceiptDelegate = [[RefreshReceiptDelegate alloc] init];
+    receiptRefreshRequest = [[SKReceiptRefreshRequest alloc] init];
     receiptRefreshRequest.delegate = refreshReceiptDelegate;
     refreshReceiptDelegate.plugin  = self;
     refreshReceiptDelegate.command = command;
     
-#if ARC_ENABLED
-    self.retainer[@"receiptRefreshRequest"] = receiptRefreshRequest;
-    self.retainer[@"receiptRefreshRequestDelegate"] = refreshReceiptDelegate;
-#else
-    [refreshReceiptDelegate retain];
-#endif
-
     DLog(@"appStoreRefreshReceipt: Starting receipt refresh request...");
     [receiptRefreshRequest start];
     DLog(@"appStoreRefreshReceipt: Receipt refresh request started");
@@ -543,7 +522,6 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
     self.unfinishedTransactions = nil;
     self.pendingTransactionUpdates = nil;
     [[SKPaymentQueue defaultQueue] removeTransactionObserver:self];
-    self.retainer = nil;
     [super dispose];
 }
 
@@ -750,16 +728,6 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
                                                       messageAsArray:callbackArgs];
     DLog(@"RefreshReceiptDelegate.requestDidFinish: Send new receipt data");
     [self.plugin.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-
-#if ARC_ENABLED
-    // do not remove delegate (self) from retainer
-    // may be it will fix the crash
-    //[self.plugin.retainer removeObjectForKey:@"receiptRefreshRequest"];
-    //[self.plugin.retainer removeObjectForKey:@"receiptRefreshRequestDelegate"];
-#else
-    [request release];
-    [self    release];
-#endif
 }
 
 - (void):(SKRequest *)request didFailWithError:(NSError*) error {
@@ -769,14 +737,6 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
     [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[error localizedDescription]];
     [self.plugin.commandDelegate sendPluginResult:pluginResult callbackId:self.command.callbackId];
 }
-
-#if ARC_DISABLED
-- (void) dealloc {
-    [plugin  release];   
-    [command release];
-    [super   dealloc];
-}
-#endif
 
 @end
 
@@ -826,18 +786,6 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
     // Now that we have loaded product informations, we can safely process pending transactions.
     g_initialized = YES;
     [self.plugin processPendingTransactionUpdates];
-
-#if ARC_ENABLED
-    // For some reason, the system needs to send more messages to the productsRequestDelegate after this.
-    // However, it doesn't retain it which causes a crash!
-    // That's why we need keep references to the productsRequest[Delegate] objects...
-    // It's no big thing anyway, and it's a one time thing.
-    // [self.plugin.retainer removeObjectForKey:@"productsRequest"];
-    // [self.plugin.retainer removeObjectForKey:@"productsRequestDelegate"];
-#else
-    [request release];
-    [self    release];
-#endif
 }
 
 - (void)request:(SKRequest *)request didFailWithError:(NSError *)error
@@ -853,14 +801,6 @@ static NSString *jsErrorCodeAsString(NSInteger code) {
         [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:localizedDescription];
     [self.plugin.commandDelegate sendPluginResult:pluginResult callbackId:self.command.callbackId];
 }
-
-#if ARC_DISABLED
-- (void) dealloc {
-    [plugin  release];
-    [command release];
-    [super   dealloc];
-}
-#endif
 
 @end
 

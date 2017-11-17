@@ -18,18 +18,23 @@
 #import "SKProduct+LocalizedPrice.h"
 #import "FileUtility.h"
 
+@class BatchProductsRequestDelegate;
+@class RefreshReceiptDelegate;
+
 @interface InAppPurchase : CDVPlugin <SKPaymentTransactionObserver> {
     NSMutableDictionary *products;
-    NSMutableDictionary *retainer;
     NSMutableDictionary *unfinishedTransactions;
     NSMutableDictionary *currentDownloads;
     NSMutableArray *pendingTransactionUpdates;
 }
 @property (nonatomic,retain) NSMutableDictionary *products;
-@property (nonatomic,retain) NSMutableDictionary *retainer;
 @property (nonatomic, retain) NSMutableDictionary *currentDownloads;
 @property (nonatomic, retain) NSMutableDictionary *unfinishedTransactions;
 @property (nonatomic, retain) NSMutableArray *pendingTransactionUpdates;
+@property (nonatomic, strong) SKProductsRequest* productsRequest;
+@property (nonatomic, strong) BatchProductsRequestDelegate* productsRequestDelegate;
+@property (nonatomic, strong) SKReceiptRefreshRequest* receiptRefreshRequest;
+@property (nonatomic, strong) RefreshReceiptDelegate* refreshReceiptDelegate;
 
 - (void) canMakePayments: (CDVInvokedUrlCommand*)command;
 
@@ -58,8 +63,6 @@
 @end
 
 @interface BatchProductsRequestDelegate : NSObject <SKProductsRequestDelegate> {
-    InAppPurchase        *plugin;
-    CDVInvokedUrlCommand *command;
 }
 
 @property (nonatomic,retain) InAppPurchase* plugin;
@@ -67,8 +70,6 @@
 @end;
 
 @interface RefreshReceiptDelegate : NSObject <SKRequestDelegate> {
-    InAppPurchase        *plugin;
-    CDVInvokedUrlCommand *command;
 }
 
 @property (nonatomic,retain) InAppPurchase* plugin;
